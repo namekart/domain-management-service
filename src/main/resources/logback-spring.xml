@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <springProperty scope="context" name="APP_NAME"      source="spring.application.name"       defaultValue="domain-management-service"/>
+    <springProperty scope="context" name="LOG_FILE"      source="logging.file.name"              defaultValue="domain-management-service.log"/>
+    <springProperty scope="context" name="LOKI_ENABLED"  source="observability.remote.enabled"   defaultValue="false"/>
+    <springProperty scope="context" name="LOKI_URL"      source="observability.loki.url"         defaultValue="http://localhost:3100"/>
+
+    <!-- %X{traceId} and %X{spanId} auto-populated by micrometer-tracing-bridge-otel -->
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${APP_NAME},%X{traceId:-},%X{spanId:-}] %replace([%X{context}]){'^\[\]$', ''} %logger{0} : %m%n%xEx"/>
+
+    <!-- ===== CONSOLE (always on) ===== -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- ===== ROLLING FILE ===== -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_FILE}</file>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>500MB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="FILE"/>
+        <queueSize>1024</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+    </appender>
+
+    <!-- ===== LOKI (only when observability.remote.enabled=true) ===== -->
+    <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+        <http>
+            <url>${LOKI_URL}/loki/api/v1/push</url>
+        </http>
+        <format>
+            <label>
+                <pattern>app=${APP_NAME},level=%level,traceId=%X{traceId:-none},spanId=%X{spanId:-none}</pattern>
+                <readMarkers>true</readMarkers>
+            </label>
+            <message>
+                <pattern>${LOG_PATTERN}</pattern>
+            </message>
+        </format>
+    </appender>
+
+    <!-- ===== FRAMEWORK NOISE SUPPRESSION ===== -->
+    <logger name="org.springframework"          level="WARN"/>
+    <logger name="org.hibernate"                level="WARN"/>
+    <logger name="com.zaxxer.hikari"            level="WARN"/>
+    <logger name="io.micrometer"                level="WARN"/>
+    <logger name="io.opentelemetry"             level="WARN"/>
+    <logger name="org.hibernate.stat"           level="INFO"/>
+
+    <!-- ===== Dev: console + file; Loki only when toggle is on ===== -->
+    <springProfile name="!prod">
+        <if condition='property("LOKI_ENABLED").equals("true")'>
+            <then>
+                <logger name="com.namekart.domainmanagement" level="INFO" additivity="false">
+                    <appender-ref ref="CONSOLE"/>
+                    <appender-ref ref="ASYNC_FILE"/>
+                    <appender-ref ref="LOKI"/>
+                </logger>
+                <root level="WARN">
+                    <appender-ref ref="CONSOLE"/>
+                    <appender-ref ref="ASYNC_FILE"/>
+                    <appender-ref ref="LOKI"/>
+                </root>
+            </then>
+            <else>
+                <logger name="com.namekart.domainmanagement" level="INFO" additivity="false">
+                    <appender-ref ref="CONSOLE"/>
+                    <appender-ref ref="ASYNC_FILE"/>
+                </logger>
+                <root level="WARN">
+                    <appender-ref ref="CONSOLE"/>
+                    <appender-ref ref="ASYNC_FILE"/>
+                </root>
+            </else>
+        </if>
+    </springProfile>
+
+    <!-- ===== Prod: console only — Promtail scrapes stdout from Docker ===== -->
+    <springProfile name="prod">
+        <logger name="com.namekart.domainmanagement" level="INFO" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+        </logger>
+        <root level="WARN">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+</configuration>

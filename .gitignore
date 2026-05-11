@@ -1,0 +1,53 @@
+### ===== BUILD =====
+target/
+build/
+!**/src/main/**/target/
+!**/src/test/**/target/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### ===== MAVEN WRAPPER =====
+.mvn/wrapper/maven-wrapper.jar
+
+### ===== LOGS =====
+*.log
+*.log.*
+*.log.*.gz
+domain-management-service.log*
+data/api-audit.log
+data/
+
+### ===== SECRETS / ENV =====
+.env
+.env.*
+*.secret
+application-local.properties
+
+### ===== IDE — IntelliJ =====
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### ===== IDE — VS Code =====
+.vscode/
+
+### ===== IDE — Eclipse / STS =====
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### ===== IDE — NetBeans =====
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### ===== OS =====
+.DS_Store
+Thumbs.db
