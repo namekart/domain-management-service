@@ -1,6 +1,6 @@
 # Domain Management Service — Developer API Guide
 
-**Base URL:** `https://domainmanagement.h.namekart.com`  
+**Base URL:** `https://dms.vps3.auctionhacker.com`  
 **Local:** `http://localhost:91`
 
 All requests/responses are `application/json`.  
@@ -52,25 +52,25 @@ Returns a paginated list of all registered domains.
 
 ```bash
 # First 10 domains
-curl -X GET "https://domainmanagement.h.namekart.com/rr/domains?limit=10&offset=0"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/domains?limit=10&offset=0"
 
 # Search by name
-curl -X GET "https://domainmanagement.h.namekart.com/rr/domains?search=example&limit=25"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/domains?search=example&limit=25"
 
 # Sort by expiry date, newest last
-curl -X GET "https://domainmanagement.h.namekart.com/rr/domains?order=expiryDate&limit=50"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/domains?order=expiryDate&limit=50"
 
 # Sort by expiry date, soonest first (expiring soon)
-curl -X GET "https://domainmanagement.h.namekart.com/rr/domains?order=-expiryDate&limit=50"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/domains?order=-expiryDate&limit=50"
 
 # Specific fields only
-curl -X GET "https://domainmanagement.h.namekart.com/rr/domains?fields=domainName,expiryDate,status&limit=100"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/domains?fields=domainName,expiryDate,status&limit=100"
 
 # Export all (no pagination)
-curl -X GET "https://domainmanagement.h.namekart.com/rr/domains?export=true"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/domains?export=true"
 
 # Count only
-curl -X GET "https://domainmanagement.h.namekart.com/rr/domains?limit=0"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/domains?limit=0"
 ```
 
 **Response `200 OK`:**
@@ -110,7 +110,7 @@ curl -X GET "https://domainmanagement.h.namekart.com/rr/domains?limit=0"
 Returns full details for a single domain.
 
 ```bash
-curl -X GET "https://domainmanagement.h.namekart.com/rr/domains/example.com"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/domains/example.com"
 ```
 
 **Response `200 OK`:**
@@ -152,7 +152,7 @@ Fetches details for a list of domain names in one call. Each domain is fetched i
 **Request body:** JSON array of domain name strings.
 
 ```bash
-curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/bulk-info" \
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/bulk-info" \
   -H "Content-Type: application/json" \
   -d '["example.com", "test.net", "hello.org"]'
 ```
@@ -200,7 +200,7 @@ curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/bulk-info" \
 Fetches a domain and returns only the domain name and its auth/EPP transfer code. Use this when you need the auth code to initiate an outbound transfer.
 
 ```bash
-curl -X GET "https://domainmanagement.h.namekart.com/rr/domains/example.com/authcode"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/domains/example.com/authcode"
 ```
 
 **Response `200 OK`:**
@@ -235,7 +235,7 @@ Registers a new domain. Returns `201` if registered immediately, `202` if the op
 | `billables` | Array | Optional | Required by some TLDs to acknowledge billing |
 
 ```bash
-curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/example.com" \
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com" \
   -H "Content-Type: application/json" \
   -d '{
     "customer": "NK-12345",
@@ -256,7 +256,7 @@ curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/example.com" \
 
 **For `.ai` domains** (24-month minimum):
 ```bash
-curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/example.ai" \
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.ai" \
   -H "Content-Type: application/json" \
   -d '{
     "customer": "NK-12345",
@@ -301,36 +301,109 @@ curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/example.ai" \
 
 `POST /rr/domains/{domainName}/update`
 
-Updates domain settings. Only fields you include are changed.
+Updates domain settings. Only fields you include are changed. To remove an optional field, specify it as empty (`""`, `[]`, or `false`).
 
-**Request body fields:**
+**Request body fields (all optional):**
+
+| Field | Type | Description | Restrictions |
+|-------|------|-------------|--------------|
+| `registrant` | String | New registrant contact handle | 3–40 chars, `[a-zA-Z0-9\-_@\.]+` |
+| `privacyProtect` | Boolean | Enable/disable WHOIS privacy | |
+| `authcode` | String | Set auth/EPP code. Pass `""` to generate a random one. | Max 64 chars |
+| `autoRenew` | Boolean | Enable/disable auto-renewal | |
+| `autoRenewPeriod` | Integer | Auto-renewal period in months | Registry-specific |
+| `ns` | Array\<String\> | Replace nameservers. Pass `[]` to remove all. | Max 10 items, 4–255 chars each |
+| `status` | Array\<Enum\> | Add/remove CLIENT_* statuses. IRTPC_TRANSFER_PROHIBITED can only be removed. | See status values below |
+| `designatedAgent` | Enum | Acting as designated agent for: `NONE`, `OLD`, `NEW`, `BOTH` | Requires DESIGNATED_AGENT permission |
+| `zone` | Object | DNS zone config | See zone fields below |
+| `contacts` | Array | Replace ADMIN / TECH / BILLING contact handles | See contacts fields below |
+| `keyData` | Array | DNSSEC key data. Pass `[]` to remove all. | See keyData fields below |
+| `dsData` | Array | DNSSEC DS data — removal only, pass `[]` to remove all. New DS records not accepted. | See dsData fields below |
+| `billables` | Array | Billing acknowledgment required by some operations | See billables fields below |
+
+**`zone` object fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `service` | Enum | `BASIC` or `PREMIUM`. Defaults to `BASIC` for new zones. |
+| `template` | String | Template name to apply (removes existing records/master) |
+| `link` | Boolean | Link zone to template. Default: `true` |
+| `master` | String | IP of hidden master (removes existing records/template) |
+| `dnssec` | Boolean | Enable DNSSEC signing |
+| `managed` | Boolean | Set `false` to convert a managed zone to unmanaged |
+
+> To remove an existing zone, omit `zone` and set `"ns": []`.
+
+**`contacts` array item fields:**
 
 | Field | Type | Required | Description |
 |-------|------|:--------:|-------------|
-| `registrant` | String | Optional | New registrant handle |
-| `privacyProtect` | Boolean | Optional | Enable/disable WHOIS privacy |
-| `autoRenew` | Boolean | Optional | Enable/disable auto-renewal |
-| `ns` | Array\<String\> | Optional | Replace nameservers. Empty array removes all. |
-| `contacts` | Array | Optional | Replace ADMIN / TECH / BILLING contacts |
-| `billables` | Array | Optional | Required by some TLDs |
+| `role` | Enum | **Required** | `ADMIN`, `BILLING`, or `TECH` |
+| `handle` | String | **Required** | Contact handle (3–40 chars) |
+
+**`keyData` array item fields:**
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `protocol` | Integer | **Required** | Must be `3` |
+| `flags` | Integer | **Required** | `256` (ZSK) or `257` (KSK) |
+| `algorithm` | Integer | **Required** | Algorithm ID: `3`, `5`, `6`, `7`, `8`, `10`, `12`, `13`, `14`, `15`, `16`, `17`, `23` |
+| `publicKey` | String | **Required** | Base64-encoded public key |
+
+**`dsData` array item fields (removal only):**
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `keyTag` | Integer | **Required** | DNSSEC keyTag (0–65536) |
+| `algorithm` | Integer | **Required** | Algorithm ID (same values as keyData) |
+| `digestType` | Integer | **Required** | `1` (SHA-1), `2` (SHA-256), `3` (GOST), `4` (SHA-384) |
+| `digest` | String | **Required** | Digest of the public key |
+
+**`billables` array item fields:**
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `product` | String | **Required** | Product code (e.g. `DOMAIN_COM`) |
+| `action` | Enum | **Required** | `CREATE`, `TRANSFER`, `RENEW`, `RESTORE`, `UPDATE`, `REGISTRANT_CHANGE`, `PRIVACY_PROTECT`, `REGISTRY_LOCK`, etc. |
+| `quantity` | Integer | Optional | Max quantity. Default: `1` |
+
+**`status` possible values:**
+
+`CLIENT_HOLD`, `CLIENT_DELETE_PROHIBITED`, `CLIENT_UPDATE_PROHIBITED`, `CLIENT_RENEW_PROHIBITED`, `CLIENT_TRANSFER_PROHIBITED` — these are the only ones you can add/remove. All other statuses (`SERVER_*`, `PENDING_*`, etc.) must remain unchanged.
 
 ```bash
 # Toggle auto-renew on
-curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/example.com/update" \
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/update" \
   -H "Content-Type: application/json" \
-  -d '{
-    "autoRenew": true
-  }'
+  -d '{ "autoRenew": true }'
 
 # Change nameservers
-curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/example.com/update" \
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/update" \
   -H "Content-Type: application/json" \
-  -d '{
-    "ns": ["ns1.namekart.com", "ns2.namekart.com"]
-  }'
+  -d '{ "ns": ["ns1.namekart.com", "ns2.namekart.com"] }'
+
+# Remove all nameservers
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/update" \
+  -H "Content-Type: application/json" \
+  -d '{ "ns": [] }'
+
+# Regenerate auth code
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/update" \
+  -H "Content-Type: application/json" \
+  -d '{ "authcode": "" }'
+
+# Set specific auth code
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/update" \
+  -H "Content-Type: application/json" \
+  -d '{ "authcode": "myNewAuthCode123!" }'
+
+# Lock domain (prevent transfers and updates)
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/update" \
+  -H "Content-Type: application/json" \
+  -d '{ "status": ["CLIENT_TRANSFER_PROHIBITED", "CLIENT_UPDATE_PROHIBITED"] }'
 
 # Enable privacy + change contacts
-curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/example.com/update" \
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/update" \
   -H "Content-Type: application/json" \
   -d '{
     "privacyProtect": true,
@@ -339,6 +412,27 @@ curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/example.com/upd
       { "role": "TECH",    "handle": "NK-REG-001" },
       { "role": "BILLING", "handle": "NK-REG-001" }
     ]
+  }'
+
+# Add DNSSEC key (algorithm 13 = ECDSA P-256 / SHA-256)
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/update" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "keyData": [
+      { "protocol": 3, "flags": 257, "algorithm": 13, "publicKey": "base64encodedkey==" }
+    ]
+  }'
+
+# Remove all DNSSEC keys
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/update" \
+  -H "Content-Type: application/json" \
+  -d '{ "keyData": [] }'
+
+# Apply DNS zone template
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/update" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "zone": { "service": "BASIC", "template": "my-template", "link": true }
   }'
 ```
 
@@ -361,7 +455,7 @@ Renews a domain for an additional period.
 
 ```bash
 # Renew for 12 months
-curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/example.com/renew" \
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/renew" \
   -H "Content-Type: application/json" \
   -d '{
     "period": "12",
@@ -371,7 +465,7 @@ curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/example.com/ren
   }'
 
 # Renew for 24 months
-curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/example.com/renew" \
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/renew" \
   -H "Content-Type: application/json" \
   -d '{
     "period": "24",
@@ -410,7 +504,7 @@ Initiates an inbound domain transfer. Returns `200` if completed immediately, `2
 | `billables` | Array | Optional | Required by some TLDs |
 
 ```bash
-curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/example.com/transfer" \
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/transfer" \
   -H "Content-Type: application/json" \
   -d '{
     "customer": "NK-12345",
@@ -463,7 +557,7 @@ curl -X POST "https://domainmanagement.h.namekart.com/rr/domains/example.com/tra
 Deletes a domain or places it into pending delete (depending on registry). No request body.
 
 ```bash
-curl -X DELETE "https://domainmanagement.h.namekart.com/rr/domains/example.com"
+curl -X DELETE "https://dms.vps3.auctionhacker.com/rr/domains/example.com"
 ```
 
 **Response `200 OK`** — deleted immediately:
@@ -497,10 +591,10 @@ Lists pending and historical notifications for a customer. Use this to check the
 
 ```bash
 # All pending notifications
-curl -X GET "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/notifications?limit=25"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/notifications?limit=25"
 
 # Check status of a specific domain operation
-curl -X GET "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/notifications?q=processIdentifier:example.com&limit=10"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/notifications?q=processIdentifier:example.com&limit=10"
 ```
 
 **Response `200 OK`:**
@@ -539,7 +633,7 @@ curl -X GET "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/notif
 Marks a notification as acknowledged. Get the `id` from the List Notifications response.
 
 ```bash
-curl -X POST "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/notifications/12345678/ack"
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/notifications/12345678/ack"
 ```
 
 **Response `200 OK`** — no body.
@@ -566,13 +660,13 @@ Returns a paginated list of contacts for a customer.
 
 ```bash
 # First 10 contacts
-curl -X GET "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/contacts?limit=10"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts?limit=10"
 
 # Search by name
-curl -X GET "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/contacts?search=john&limit=25"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts?search=john&limit=25"
 
 # Export all
-curl -X GET "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/contacts?export=true"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts?export=true"
 ```
 
 **Response `200 OK`:**
@@ -609,7 +703,7 @@ curl -X GET "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/conta
 Returns full details for a single contact.
 
 ```bash
-curl -X GET "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/contacts/NK-REG-001"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts/NK-REG-001"
 ```
 
 **Response `200 OK`:**
@@ -643,7 +737,7 @@ Fetches details for a list of contact handles. Each contact is fetched individua
 **Request body:** JSON array of contact handle strings.
 
 ```bash
-curl -X POST "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/contacts/bulk-info" \
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts/bulk-info" \
   -H "Content-Type: application/json" \
   -d '["NK-REG-001", "NK-REG-002", "NK-REG-999"]'
 ```
@@ -697,7 +791,7 @@ Creates a new contact. The `{handle}` in the URL is the identifier you assign to
 | `brand` | String | Optional | Brand name. Default: `"default"` |
 
 ```bash
-curl -X POST "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/contacts/NK-REG-001" \
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts/NK-REG-001" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "John Doe",
@@ -739,7 +833,7 @@ Updates an existing contact. Only fields you include are changed — all fields 
 
 ```bash
 # Update email and phone only
-curl -X POST "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/contacts/NK-REG-001/update" \
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts/NK-REG-001/update" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "newemail@example.com",
@@ -747,7 +841,7 @@ curl -X POST "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/cont
   }'
 
 # Update address
-curl -X POST "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/contacts/NK-REG-001/update" \
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts/NK-REG-001/update" \
   -H "Content-Type: application/json" \
   -d '{
     "addressLine": ["456 New Ave", "Suite 100"],
@@ -768,7 +862,7 @@ curl -X POST "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/cont
 Deletes a contact. The contact must not be in use on any active domain.
 
 ```bash
-curl -X DELETE "https://domainmanagement.h.namekart.com/rr/customers/NK-12345/contacts/NK-REG-001"
+curl -X DELETE "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts/NK-REG-001"
 ```
 
 **Response `200 OK`** — no body.
@@ -812,6 +906,6 @@ Only needed for TLDs that require billing acknowledgment. If the API returns `Bi
 ## Health check
 
 ```bash
-curl https://domainmanagement.h.namekart.com/health
+curl https://dms.vps3.auctionhacker.com/health
 # → "Domain Management Service is healthy!"
 ```

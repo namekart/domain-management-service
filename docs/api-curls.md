@@ -199,10 +199,13 @@ curl -X POST "https://api.yoursrs.com/v2/domains/example.ai" \
 
 ## 5. Update Domain
 
-> AMP does NOT set `customer` or `registrant` on update requests. Only these fields.
+All fields optional. Only fields you include are changed.
 
-**DMS:**
+**Supported fields:** `registrant`, `privacyProtect`, `authcode`, `autoRenew`, `autoRenewPeriod`, `ns`, `status`, `designatedAgent`, `zone`, `contacts`, `keyData`, `dsData`, `billables`
+
+**DMS — common examples:**
 ```bash
+# Change registrant + contacts
 curl -X POST "http://localhost:91/rr/domains/example.com/update" \
   -H "Content-Type: application/json" \
   -d '{
@@ -215,6 +218,21 @@ curl -X POST "http://localhost:91/rr/domains/example.com/update" \
       { "role": "BILLING", "handle": "YOUR_REGISTRANT_HANDLE" }
     ]
   }'
+
+# Regenerate auth code
+curl -X POST "http://localhost:91/rr/domains/example.com/update" \
+  -H "Content-Type: application/json" \
+  -d '{ "authcode": "" }'
+
+# Change nameservers
+curl -X POST "http://localhost:91/rr/domains/example.com/update" \
+  -H "Content-Type: application/json" \
+  -d '{ "ns": ["ns1.namekart.com", "ns2.namekart.com"] }'
+
+# Lock domain
+curl -X POST "http://localhost:91/rr/domains/example.com/update" \
+  -H "Content-Type: application/json" \
+  -d '{ "status": ["CLIENT_TRANSFER_PROHIBITED", "CLIENT_UPDATE_PROHIBITED"] }'
 ```
 
 **Direct RR (VPS3):**
