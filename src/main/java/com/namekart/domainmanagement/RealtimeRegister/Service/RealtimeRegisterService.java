@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -124,5 +125,65 @@ public class RealtimeRegisterService {
         result.put("domainName", domain.getDomainName());
         result.put("authcode", domain.getAuthcode());
         return result;
+    }
+
+    public ResponseEntity<RrDomainCheckResponse> checkDomain(String domainName, Boolean renewPrice) {
+        log.info("checkDomain domain={}", domainName);
+        return rrFeign.checkDomain(domainName, renewPrice);
+    }
+
+    public ResponseEntity<RrTransferResponse> getTransferStatus(String domainName, Integer processId) {
+        log.info("getTransferStatus domain={} processId={}", domainName, processId);
+        return rrFeign.getTransferStatus(domainName, processId);
+    }
+
+    public ResponseEntity<Void> authorizeTransfer(String domainName, Integer processId, String action) {
+        log.info("authorizeTransfer domain={} processId={} action={}", domainName, processId, action);
+        return rrFeign.authorizeTransfer(domainName, processId, action);
+    }
+
+    public ResponseEntity<RrRestoreResponse> restoreDomain(String domainName, Boolean quote, RrRestoreRequest request) {
+        log.info("restoreDomain domain={} quote={}", domainName, quote);
+        return rrFeign.restoreDomain(domainName, quote, request);
+    }
+
+    public ResponseEntity<Void> pushTransferDomain(String domainName, RrPushTransferRequest request) {
+        log.info("pushTransferDomain domain={} recipient={}", domainName, request.getRecipient());
+        return rrFeign.pushTransferDomain(domainName, request);
+    }
+
+    public ResponseEntity<RrDnsZoneResponse> getDnsZone(String domainName) {
+        log.info("getDnsZone domain={}", domainName);
+        RrDomainDetails domain = rrFeign.getDomain(domainName);
+        Integer zoneId = domain.getZone() != null ? domain.getZone().getId() : null;
+        if (zoneId == null) {
+            throw new IllegalStateException("Domain " + domainName + " has no DNS zone");
+        }
+        return rrFeign.getDnsZone(zoneId);
+    }
+
+    public ResponseEntity<Void> updateDnsZone(String domainName, RrDnsZoneUpdateRequest request) {
+        log.info("updateDnsZone domain={}", domainName);
+        RrDomainDetails domain = rrFeign.getDomain(domainName);
+        Integer zoneId = domain.getZone() != null ? domain.getZone().getId() : null;
+        if (zoneId == null) {
+            throw new IllegalStateException("Domain " + domainName + " has no DNS zone");
+        }
+        return rrFeign.updateDnsZone(zoneId, request);
+    }
+
+    public ResponseEntity<RrProcessResponse> getProcess(Integer processId, String fields) {
+        log.info("getProcess processId={}", processId);
+        return rrFeign.getProcess(processId, fields);
+    }
+
+    public ResponseEntity<List<RrPriceListItem>> getPriceList(String customer, String currency) {
+        log.info("getPriceList customer={} currency={}", customer, currency);
+        return rrFeign.getPriceList(customer, currency);
+    }
+
+    public ResponseEntity<Map<String, Object>> getTldInfo(String tld) {
+        log.info("getTldInfo tld={}", tld);
+        return rrFeign.getTldInfo(tld);
     }
 }

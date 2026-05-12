@@ -129,4 +129,72 @@ public class RealtimeRegisterController {
     public Map<String, String> getAuthCode(@PathVariable String domainName) {
         return rrService.getAuthCode(domainName);
     }
+
+    @GetMapping("/domains/{domainName}/check")
+    public ResponseEntity<RrDomainCheckResponse> checkDomain(
+            @PathVariable String domainName,
+            @RequestParam(required = false) Boolean renewPrice) {
+        return rrService.checkDomain(domainName, renewPrice);
+    }
+
+    @GetMapping("/domains/{domainName}/transfer/{processId}")
+    public ResponseEntity<RrTransferResponse> getTransferStatus(
+            @PathVariable String domainName,
+            @PathVariable Integer processId) {
+        return rrService.getTransferStatus(domainName, processId);
+    }
+
+    @PostMapping("/domains/{domainName}/transfer/{processId}/{action}")
+    public ResponseEntity<Void> authorizeTransfer(
+            @PathVariable String domainName,
+            @PathVariable Integer processId,
+            @PathVariable String action) {
+        return rrService.authorizeTransfer(domainName, processId, action);
+    }
+
+    @PostMapping("/domains/{domainName}/restore")
+    public ResponseEntity<RrRestoreResponse> restoreDomain(
+            @PathVariable String domainName,
+            @RequestParam(required = false) Boolean quote,
+            @RequestBody RrRestoreRequest request) {
+        return rrService.restoreDomain(domainName, quote, request);
+    }
+
+    @PostMapping("/domains/{domainName}/push")
+    public ResponseEntity<Void> pushTransferDomain(
+            @PathVariable String domainName,
+            @RequestBody RrPushTransferRequest request) {
+        return rrService.pushTransferDomain(domainName, request);
+    }
+
+    @GetMapping("/domains/{domainName}/zone")
+    public ResponseEntity<RrDnsZoneResponse> getDnsZone(@PathVariable String domainName) {
+        return rrService.getDnsZone(domainName);
+    }
+
+    @PostMapping("/domains/{domainName}/zone/update")
+    public ResponseEntity<Void> updateDnsZone(
+            @PathVariable String domainName,
+            @RequestBody RrDnsZoneUpdateRequest request) {
+        return rrService.updateDnsZone(domainName, request);
+    }
+
+    @GetMapping("/processes/{processId}")
+    public ResponseEntity<RrProcessResponse> getProcess(
+            @PathVariable Integer processId,
+            @RequestParam(required = false) String fields) {
+        return rrService.getProcess(processId, fields);
+    }
+
+    @GetMapping("/customers/{customer}/pricelist")
+    public ResponseEntity<List<RrPriceListItem>> getPriceList(
+            @PathVariable String customer,
+            @RequestParam(required = false) String currency) {
+        return rrService.getPriceList(customer, currency);
+    }
+
+    @GetMapping("/tlds/{tld}")
+    public ResponseEntity<Map<String, Object>> getTldInfo(@PathVariable String tld) {
+        return rrService.getTldInfo(tld);
+    }
 }
