@@ -116,17 +116,17 @@ public class RealtimeRegisterController {
         } catch (Exception e) { logError("POST /rr/domains/" + domainName + "/unlock", e); throw e; }
     }
 
-    @PostMapping("/domains/{domainName}/renew")
-    public ResponseEntity<Void> renewDomain(
-            @PathVariable String domainName,
-            @RequestBody RrRenewRequest request) {
-        logReq("POST /rr/domains/{domainName}/renew", "domainName", domainName, "body", request);
-        try {
-            ResponseEntity<Void> resp = rrService.renewDomain(domainName, request);
-            logResp("POST /rr/domains/" + domainName + "/renew", resp.getStatusCode());
-            return resp;
-        } catch (Exception e) { logError("POST /rr/domains/" + domainName + "/renew", e); throw e; }
-    }
+    // @PostMapping("/domains/{domainName}/renew")
+    // public ResponseEntity<Void> renewDomain(
+    //         @PathVariable String domainName,
+    //         @RequestBody RrRenewRequest request) {
+    //     logReq("POST /rr/domains/{domainName}/renew", "domainName", domainName, "body", request);
+    //     try {
+    //         ResponseEntity<Void> resp = rrService.renewDomain(domainName, request);
+    //         logResp("POST /rr/domains/" + domainName + "/renew", resp.getStatusCode());
+    //         return resp;
+    //     } catch (Exception e) { logError("POST /rr/domains/" + domainName + "/renew", e); throw e; }
+    // }
 
     @DeleteMapping("/domains/{domainName}")
     public ResponseEntity<Void> deleteDomain(@PathVariable String domainName) {
