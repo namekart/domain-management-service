@@ -54,6 +54,28 @@ public class RealtimeRegisterService {
         return rrFeign.updateDomain(domainName, request);
     }
 
+    public ResponseEntity<Void> lockDomain(String domainName) {
+        log.info("lockDomain domain={}", domainName);
+        RrDomainDetails domain = rrFeign.getDomain(domainName);
+        List<String> statuses = new ArrayList<>(domain.getStatus() != null ? domain.getStatus() : List.of());
+        if (!statuses.contains("CLIENT_TRANSFER_PROHIBITED")) {
+            statuses.add("CLIENT_TRANSFER_PROHIBITED");
+        }
+        RrUpdateRequest req = new RrUpdateRequest();
+        req.setStatus(statuses);
+        return rrFeign.updateDomain(domainName, req);
+    }
+
+    public ResponseEntity<Void> unlockDomain(String domainName) {
+        log.info("unlockDomain domain={}", domainName);
+        RrDomainDetails domain = rrFeign.getDomain(domainName);
+        List<String> statuses = new ArrayList<>(domain.getStatus() != null ? domain.getStatus() : List.of());
+        statuses.remove("CLIENT_TRANSFER_PROHIBITED");
+        RrUpdateRequest req = new RrUpdateRequest();
+        req.setStatus(statuses);
+        return rrFeign.updateDomain(domainName, req);
+    }
+
     public ResponseEntity<Void> renewDomain(String domainName, RrRenewRequest request) {
         log.info("renewDomain domain={}", domainName);
         return rrFeign.renewDomain(domainName, request);

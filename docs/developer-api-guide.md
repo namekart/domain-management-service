@@ -18,17 +18,29 @@ No authentication header required from the caller — the service handles RR API
 | 4 | `GET` | `/rr/domains/{domainName}/authcode` | Get domain auth/transfer code |
 | 5 | `POST` | `/rr/domains/{domainName}` | Register a domain |
 | 6 | `POST` | `/rr/domains/{domainName}/update` | Update domain settings |
+| 6a | `POST` | `/rr/domains/{domainName}/lock` | Lock domain for transfer (adds `CLIENT_TRANSFER_PROHIBITED`) |
+| 6b | `POST` | `/rr/domains/{domainName}/unlock` | Unlock domain for transfer (removes `CLIENT_TRANSFER_PROHIBITED`) |
 | 7 | `POST` | `/rr/domains/{domainName}/renew` | Renew a domain |
 | 8 | `POST` | `/rr/domains/{domainName}/transfer` | Transfer a domain in |
-| 9 | `DELETE` | `/rr/domains/{domainName}` | Delete a domain |
-| 10 | `GET` | `/rr/customers/{customer}/notifications` | List notifications |
-| 11 | `POST` | `/rr/customers/{customer}/notifications/{notificationId}/ack` | Acknowledge a notification |
-| 12 | `GET` | `/rr/customers/{customer}/contacts` | List contacts with filters & pagination |
-| 13 | `GET` | `/rr/customers/{customer}/contacts/{handle}` | Get single contact |
-| 14 | `POST` | `/rr/customers/{customer}/contacts/bulk-info` | Get details for multiple contacts at once |
-| 15 | `POST` | `/rr/customers/{customer}/contacts/{handle}` | Create a contact |
-| 16 | `POST` | `/rr/customers/{customer}/contacts/{handle}/update` | Update a contact |
-| 17 | `DELETE` | `/rr/customers/{customer}/contacts/{handle}` | Delete a contact |
+| 9 | `GET` | `/rr/domains/{domainName}/transfer/{processId}` | Get transfer status |
+| 10 | `POST` | `/rr/domains/{domainName}/transfer/{processId}/{action}` | Approve or reject a transfer |
+| 11 | `GET` | `/rr/domains/{domainName}/check` | Check domain availability & price |
+| 12 | `POST` | `/rr/domains/{domainName}/restore` | Restore a domain from redemption |
+| 13 | `POST` | `/rr/domains/{domainName}/push` | Push domain to another RTR registrar |
+| 14 | `GET` | `/rr/domains/{domainName}/zone` | Get DNS zone records |
+| 15 | `POST` | `/rr/domains/{domainName}/zone/update` | Update DNS zone records |
+| 16 | `DELETE` | `/rr/domains/{domainName}` | Delete a domain |
+| 17 | `GET` | `/rr/customers/{customer}/notifications` | List notifications |
+| 18 | `POST` | `/rr/customers/{customer}/notifications/{notificationId}/ack` | Acknowledge a notification |
+| 19 | `GET` | `/rr/customers/{customer}/contacts` | List contacts with filters & pagination |
+| 20 | `GET` | `/rr/customers/{customer}/contacts/{handle}` | Get single contact |
+| 21 | `POST` | `/rr/customers/{customer}/contacts/bulk-info` | Get details for multiple contacts at once |
+| 22 | `POST` | `/rr/customers/{customer}/contacts/{handle}` | Create a contact |
+| 23 | `POST` | `/rr/customers/{customer}/contacts/{handle}/update` | Update a contact |
+| 24 | `DELETE` | `/rr/customers/{customer}/contacts/{handle}` | Delete a contact |
+| 25 | `GET` | `/rr/processes/{processId}` | Get async process status |
+| 26 | `GET` | `/rr/customers/{customer}/pricelist` | Get TLD price list |
+| 27 | `GET` | `/rr/tlds/{tld}` | Get TLD info & capabilities |
 
 ---
 
@@ -440,6 +452,50 @@ curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/update" 
 
 ---
 
+## 6a. Lock Domain
+
+`POST /rr/domains/{domainName}/lock`
+
+Locks a domain against outbound transfers by adding `CLIENT_TRANSFER_PROHIBITED` to its status list. Fetches the current domain status first, then calls the RTR update API with the merged status list. Idempotent — safe to call if the domain is already locked.
+
+**Request body:** none
+
+```bash
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/lock"
+```
+
+**Response `200 OK`** — locked immediately. **`202 Accepted`** — async (poll notifications).
+
+**Domain status after lock:**
+```json
+{ "status": ["OK", "CLIENT_TRANSFER_PROHIBITED"] }
+```
+
+---
+
+## 6b. Unlock Domain
+
+`POST /rr/domains/{domainName}/unlock`
+
+Unlocks a domain for outbound transfer by removing `CLIENT_TRANSFER_PROHIBITED` from its status list. Fetches the current domain status first, removes the status, then calls the RTR update API. Idempotent — safe to call if the domain is already unlocked.
+
+**Request body:** none
+
+```bash
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/unlock"
+```
+
+**Response `200 OK`** — unlocked immediately. **`202 Accepted`** — async (poll notifications).
+
+**Domain status after unlock:**
+```json
+{ "status": ["OK"] }
+```
+
+> After unlocking, use endpoint **#4** (`/authcode`) to retrieve the EPP auth code needed to initiate a transfer at the receiving registrar.
+
+---
+
 ## 7. Renew Domain
 
 `POST /rr/domains/{domainName}/renew`
@@ -497,10 +553,16 @@ Initiates an inbound domain transfer. Returns `200` if completed immediately, `2
 |-------|------|:--------:|-------------|
 | `customer` | String | **Required** | Your customer handle |
 | `registrant` | String | **Required** | Registrant contact handle |
-| `authcode` | String | **Required** | Transfer authorization/EPP code from current registrar |
+| `authcode` | String | Optional | EPP/auth code from current registrar |
+| `privacyProtect` | Boolean | Optional | Enable WHOIS privacy after transfer |
+| `period` | Integer | Optional | Transfer period in months (registry minimum if omitted) |
 | `autoRenew` | Boolean | Optional | Auto-renewal after transfer. Default: `false` |
 | `ns` | Array\<String\> | Optional | Nameservers to set after transfer. Omit to keep existing. |
+| `transferContacts` | Array\<Enum\> | Optional | Preferred FOA contacts: `REGISTRANT`, `ADMIN` |
+| `designatedAgent` | Enum | Optional | `NONE`, `OLD`, `NEW`, `BOTH` |
+| `zone` | Object | Optional | DNS zone config to provision on transfer (see zone fields in §6) |
 | `contacts` | Array | Optional | ADMIN / TECH / BILLING contact handles |
+| `keyData` | Array | Optional | DNSSEC key data (see keyData fields in §6) |
 | `billables` | Array | Optional | Required by some TLDs |
 
 ```bash
@@ -550,7 +612,286 @@ curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/transfer
 
 ---
 
-## 9. Delete Domain
+## 9. Get Transfer Status
+
+`GET /rr/domains/{domainName}/transfer/{processId}`
+
+Returns the current status of an inbound or outbound transfer, including a full status history log.
+
+```bash
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/domains/example.com/transfer/98765"
+```
+
+**Response `200 OK`:**
+```json
+{
+  "domainName": "example.com",
+  "registrar": null,
+  "status": "pending",
+  "requestedDate": "2025-01-01T00:00:00Z",
+  "actionDate": "2025-01-08T00:00:00Z",
+  "expiryDate": null,
+  "type": "IN",
+  "processId": 98765,
+  "log": [
+    { "date": "2025-01-01T10:00:00Z", "status": "pendingfoa", "message": "Waiting for registrant approval" },
+    { "date": "2025-01-01T11:00:00Z", "status": "pending",    "message": "Transfer approved by registrant" }
+  ]
+}
+```
+
+> `registrar` is only present on outgoing (`OUT`) transfers.
+
+---
+
+## 10. Approve or Reject Transfer
+
+`POST /rr/domains/{domainName}/transfer/{processId}/{action}`
+
+Approves or rejects a pending transfer. `{action}` must be `approve` or `reject`. No request body.
+
+> Restricted to **gateway accounts** only.
+
+```bash
+# Approve
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/transfer/98765/approve"
+
+# Reject
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/transfer/98765/reject"
+```
+
+**Response `200 OK`** — no body.
+
+---
+
+## 11. Check Domain Availability
+
+`GET /rr/domains/{domainName}/check`
+
+Checks whether a domain name is available for registration, and optionally returns pricing.
+
+**Query parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `renewPrice` | Boolean | If `true`, include the renewal price in the response |
+
+```bash
+# Basic availability check
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/domains/example.com/check"
+
+# Include renewal price
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/domains/example.com/check?renewPrice=true"
+```
+
+**Response `200 OK` — available:**
+```json
+{
+  "available": true,
+  "premium": false,
+  "price": null,
+  "renewPrice": null,
+  "currency": null,
+  "reason": null
+}
+```
+
+**Response `200 OK` — premium domain:**
+```json
+{
+  "available": true,
+  "premium": true,
+  "price": 50000,
+  "renewPrice": 50000,
+  "currency": "USD",
+  "reason": null
+}
+```
+
+**Response `200 OK` — not available:**
+```json
+{
+  "available": false,
+  "reason": "Domain is already registered",
+  "premium": false,
+  "price": null,
+  "renewPrice": null,
+  "currency": null
+}
+```
+
+> Prices are in **cents** — divide by 100 for display (e.g. `1099` → `$10.99`).
+
+---
+
+## 12. Restore Domain
+
+`POST /rr/domains/{domainName}/restore`
+
+Restores a domain that has entered the redemption grace period after expiry.
+
+**Query parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `quote` | Boolean | If `true`, returns a price quote without executing the restore |
+
+**Request body fields:**
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `reason` | String | **Required** | Reason for restoring the domain |
+| `billables` | Array | Optional | Required if RTR returns `BillableAcknowledgmentNeededException` |
+
+```bash
+# Dry-run — get price quote
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/restore?quote=true" \
+  -H "Content-Type: application/json" \
+  -d '{ "reason": "Accidental deletion" }'
+
+# Execute restore
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/restore" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reason": "Accidental deletion",
+    "billables": [
+      { "product": "DOMAIN_COM", "action": "RESTORE", "quantity": 1 }
+    ]
+  }'
+```
+
+**Response `200 OK`:**
+```json
+{
+  "domainName": "example.com",
+  "expiryDate": "2027-01-01T00:00:00Z"
+}
+```
+
+---
+
+## 13. Push Domain (Internal Transfer)
+
+`POST /rr/domains/{domainName}/push`
+
+Pushes a domain to another registrar within the RTR network.
+
+**Request body fields:**
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `recipient` | String | **Required** | Target registrar handle in the RTR network |
+
+```bash
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/push" \
+  -H "Content-Type: application/json" \
+  -d '{ "recipient": "target-registrar-handle" }'
+```
+
+**Response:** `200 OK` or `202 Accepted` — no body.
+
+---
+
+## 14. Get DNS Zone
+
+`GET /rr/domains/{domainName}/zone`
+
+Returns the full DNS zone for a domain, including all DNS records.
+
+> Internally this fetches the domain to get its zone ID, then fetches the zone from `/v2/dns/zones/{id}`. The domain must have an active DNS zone provisioned.
+
+```bash
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/domains/example.com/zone"
+```
+
+**Response `200 OK`:**
+```json
+{
+  "id": 54321,
+  "name": "example.com",
+  "managed": true,
+  "service": "BASIC",
+  "dnssec": false,
+  "hostMaster": "hostmaster@example.com",
+  "refresh": 3600,
+  "retry": 900,
+  "expire": 1209600,
+  "ttl": 3600,
+  "records": [
+    { "name": "example.com",     "type": "A",     "content": "1.2.3.4",      "ttl": 3600, "prio": null },
+    { "name": "www.example.com", "type": "CNAME", "content": "example.com.", "ttl": 3600, "prio": null },
+    { "name": "example.com",     "type": "MX",    "content": "mail.example.com.", "ttl": 3600, "prio": 10 }
+  ],
+  "defaultRecords": []
+}
+```
+
+**Error — domain has no zone:**
+```json
+{ "error": "Domain example.com has no DNS zone" }
+```
+
+---
+
+## 15. Update DNS Zone
+
+`POST /rr/domains/{domainName}/zone/update`
+
+Replaces DNS records for a domain's zone. All fields are optional — only the fields you send are changed.
+
+> **Important:** The `records` field **replaces the entire record set** — send all records you want, not just the changed ones.
+
+> Internally this fetches the domain to get its zone ID, then calls `/v2/dns/zones/{id}/update`.
+
+**Request body fields (all optional):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `records` | Array | Full set of DNS records — replaces existing records |
+| `ttl` | Integer | Default TTL in seconds (min 60, max 2419200, default 3600) |
+| `hostMaster` | String | Hostmaster email address |
+| `refresh` | Integer | Zone refresh interval in seconds (min 1) |
+| `retry` | Integer | Zone retry interval in seconds (default 3600) |
+| `expire` | Integer | Zone expiry in seconds (default 1209600) |
+| `template` | String | Apply a named DNS template |
+| `link` | Boolean | Link zone to template (default `true`) |
+| `master` | String | IP of hidden master (removes records and template) |
+| `ns` | Array\<String\> | Zone nameservers (max 10) |
+| `dnssec` | Boolean | Enable DNSSEC signing |
+
+**`records` array item fields:**
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `name` | String | **Required** | Full record name (e.g. `www.example.com`) |
+| `type` | Enum | **Required** | `A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, `SRV`, `CAA`, `TLSA`, `ALIAS`, `SOA`, etc. |
+| `content` | String | **Required** | Record value |
+| `ttl` | Integer | Optional | Record-specific TTL (inherits zone default if omitted) |
+| `prio` | Integer | Optional | Priority — required for `MX` and `SRV` records |
+
+```bash
+# Set A + CNAME + MX records (replaces all existing records)
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/zone/update" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "records": [
+      { "name": "example.com",     "type": "A",     "content": "1.2.3.4",           "ttl": 3600 },
+      { "name": "www.example.com", "type": "CNAME", "content": "example.com.",      "ttl": 3600 },
+      { "name": "example.com",     "type": "MX",    "content": "mail.example.com.", "ttl": 3600, "prio": 10 }
+    ]
+  }'
+
+# Update only the default TTL (no record changes)
+curl -X POST "https://dms.vps3.auctionhacker.com/rr/domains/example.com/zone/update" \
+  -H "Content-Type: application/json" \
+  -d '{ "ttl": 300 }'
+```
+
+**Response `200 OK`** — no body.
+
+---
+
+## 16. Delete Domain
 
 `DELETE /rr/domains/{domainName}`
 
@@ -569,7 +910,7 @@ curl -X DELETE "https://dms.vps3.auctionhacker.com/rr/domains/example.com"
 
 ---
 
-## 10. List Notifications
+## 17. List Notifications
 
 `GET /rr/customers/{customer}/notifications`
 
@@ -626,7 +967,7 @@ curl -X GET "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/notificati
 
 ---
 
-## 11. Acknowledge Notification
+## 18. Acknowledge Notification
 
 `POST /rr/customers/{customer}/notifications/{notificationId}/ack`
 
@@ -640,7 +981,7 @@ curl -X POST "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/notificat
 
 ---
 
-## 12. List Contacts
+## 19. List Contacts
 
 `GET /rr/customers/{customer}/contacts`
 
@@ -696,7 +1037,7 @@ curl -X GET "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts?e
 
 ---
 
-## 13. Get Contact
+## 20. Get Contact
 
 `GET /rr/customers/{customer}/contacts/{handle}`
 
@@ -728,7 +1069,7 @@ curl -X GET "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts/N
 
 ---
 
-## 14. Bulk Get Contacts
+## 21. Bulk Get Contacts
 
 `POST /rr/customers/{customer}/contacts/bulk-info`
 
@@ -768,7 +1109,7 @@ curl -X POST "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts/
 
 ---
 
-## 15. Create Contact
+## 22. Create Contact
 
 `POST /rr/customers/{customer}/contacts/{handle}`
 
@@ -810,7 +1151,7 @@ curl -X POST "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts/
 
 ---
 
-## 16. Update Contact
+## 23. Update Contact
 
 `POST /rr/customers/{customer}/contacts/{handle}/update`
 
@@ -855,7 +1196,7 @@ curl -X POST "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contacts/
 
 ---
 
-## 17. Delete Contact
+## 24. Delete Contact
 
 `DELETE /rr/customers/{customer}/contacts/{handle}`
 
@@ -869,12 +1210,114 @@ curl -X DELETE "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/contact
 
 ---
 
+## 25. Get Process Status
+
+`GET /rr/processes/{processId}`
+
+Returns the status and details of any async operation (registration, transfer, renew, update, restore). Get the `processId` from the original operation's response.
+
+**Query parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `fields` | String | Comma-separated list of fields to return (optimization) |
+
+```bash
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/processes/98765"
+```
+
+**Response `200 OK`:**
+```json
+{
+  "id": 98765,
+  "user": "NK-12345/admin",
+  "customer": "NK-12345",
+  "status": "COMPLETED",
+  "statusDetail": null,
+  "createdDate": "2025-01-01T10:00:00Z",
+  "updatedDate": "2025-01-01T10:05:00Z",
+  "startedDate": "2025-01-01T10:00:01Z",
+  "type": "domain",
+  "identifier": "example.com",
+  "action": "create",
+  "command": {},
+  "error": null,
+  "resumeTypes": [],
+  "billables": [
+    { "product": "DOMAIN_COM", "action": "CREATE", "quantity": 1 }
+  ]
+}
+```
+
+**`status` values:**
+
+| Value | Meaning |
+|-------|---------|
+| `NEW` | Just created, not yet started |
+| `VALIDATED` | Validated, waiting to run |
+| `RUNNING` | In progress |
+| `COMPLETED` | Finished successfully |
+| `FAILED` | Failed — check `error` field |
+| `IN_DOUBT` | Completed but outcome uncertain |
+| `CANCELLED` | Cancelled |
+| `INVALID` | Invalid input |
+| `SCHEDULED` | Scheduled for future execution |
+| `SUSPENDED` | Suspended, waiting for manual action |
+
+---
+
+## 26. Get Price List
+
+`GET /rr/customers/{customer}/pricelist`
+
+Returns registration, renewal, and transfer prices for all supported TLDs.
+
+**Query parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `currency` | String | Currency code. E.g. `USD`. Defaults to account currency. |
+
+```bash
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/customers/NK-12345/pricelist?currency=USD"
+```
+
+**Response `200 OK`:**
+```json
+[
+  { "product": "DOMAIN_COM", "action": "CREATE", "price": 1099, "currency": "USD" },
+  { "product": "DOMAIN_COM", "action": "RENEW",  "price": 1099, "currency": "USD" },
+  { "product": "DOMAIN_NET", "action": "CREATE", "price": 1199, "currency": "USD" },
+  { "product": "DOMAIN_AI",  "action": "CREATE", "price": 8900, "currency": "USD" }
+]
+```
+
+> Prices are in **cents** — divide by 100 for display.
+
+---
+
+## 27. Get TLD Info
+
+`GET /rr/tlds/{tld}`
+
+Returns detailed info for a TLD: minimum/maximum registration period, supported operations, required contact fields, available billable products, and registry-specific constraints.
+
+```bash
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/tlds/com"
+curl -X GET "https://dms.vps3.auctionhacker.com/rr/tlds/ai"
+```
+
+**Response `200 OK`** — returns a complex nested object from RTR directly. Key top-level fields include `tld`, `registryProducts`, `periods`, `operations`, and `requiredContactFields`.
+
+---
+
 ## Async operation flow
 
-Many operations (register, update, transfer, renew) may return `202 Accepted`. Follow this pattern:
+Many operations (register, update, transfer, renew, restore) may return `202 Accepted`. Two ways to track:
 
+**Option A — Notifications (recommended):**
 ```
-POST /rr/domains/example.com          → 202
+POST /rr/domains/example.com          → 202 { processId: 98765 }
          ↓
 GET  /rr/customers/{customer}/notifications?q=processIdentifier:example.com
          ↓
@@ -884,6 +1327,18 @@ Check subjectStatus:
   PENDING / NEW   → wait and retry 🔄
          ↓
 POST /rr/customers/{customer}/notifications/{id}/ack   → acknowledge
+```
+
+**Option B — Process status (direct):**
+```
+POST /rr/domains/example.com          → 202 { processId: 98765 }
+         ↓
+GET  /rr/processes/98765
+         ↓
+Check status:
+  COMPLETED  → done ✅
+  FAILED     → check error field ❌
+  RUNNING    → wait and retry 🔄
 ```
 
 ---

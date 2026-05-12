@@ -47,6 +47,16 @@ public class RealtimeRegisterController {
         return rrService.updateDomain(domainName, request);
     }
 
+    @PostMapping("/domains/{domainName}/lock")
+    public ResponseEntity<Void> lockDomain(@PathVariable String domainName) {
+        return rrService.lockDomain(domainName);
+    }
+
+    @PostMapping("/domains/{domainName}/unlock")
+    public ResponseEntity<Void> unlockDomain(@PathVariable String domainName) {
+        return rrService.unlockDomain(domainName);
+    }
+
     @PostMapping("/domains/{domainName}/renew")
     public ResponseEntity<Void> renewDomain(
             @PathVariable String domainName,
