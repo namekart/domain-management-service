@@ -4,18 +4,34 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import feign.Response;
 import feign.codec.ErrorDecoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 
 public class RealtimeRegisterErrorDecoder implements ErrorDecoder {
 
+    private static final Logger log = LoggerFactory.getLogger(RealtimeRegisterErrorDecoder.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private static final Set<String> RECORD_ERROR_TYPES = Set.of(
+            "AuthorizationError",
+            "InsufficientCreditException",
+            "ObjectDoesNotExist",
+            "ObjectExists",
+            "ObjectStatusProhibitsOperation",
+            "ProcessError",
+            "BillableAcknowledgmentNeededException"
+    );
 
     @Override
     public Exception decode(String methodKey, Response response) {
         String body = readBody(response);
         String status = "[" + response.status() + " " + response.reason() + "]";
+
+        log.error("[RR][ERROR_RESPONSE] method={} status={} body={}", methodKey, status, body);
 
         if (body != null && !body.isBlank()) {
             try {
@@ -24,7 +40,8 @@ public class RealtimeRegisterErrorDecoder implements ErrorDecoder {
                 String message = text(root, "message");
 
                 if (type != null) {
-                    return new RrApiException(type, message != null ? message : "", status);
+                    boolean recordError = RECORD_ERROR_TYPES.contains(type);
+                    return new RrApiException(type, message != null ? message : "", status, recordError, body);
                 }
                 if (message != null) return new RuntimeException(status + " " + message);
             } catch (Exception ignored) {}

@@ -2,6 +2,7 @@ package com.namekart.domainmanagement.RealtimeRegister.Controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.namekart.domainmanagement.RealtimeRegister.Entity.*;
+import com.namekart.domainmanagement.RealtimeRegister.Feign.RrApiException;
 import com.namekart.domainmanagement.RealtimeRegister.Service.RealtimeRegisterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +40,16 @@ public class RealtimeRegisterController {
     }
 
     private void logError(String endpoint, Exception e) {
-        log.error("[RR][ERROR] {} -> {} {}", endpoint, e.getClass().getSimpleName(), e.getMessage());
+        if (e instanceof RrApiException rre) {
+            log.error("[RR][ERROR] endpoint={} userMessage={}", endpoint, rre.getMessage());
+            log.error("[RR][RAW] endpoint={} body={}", endpoint, rre.getRawBody());
+            if (rre.isRecordError()) {
+                log.error("[RR][RECORD] endpoint={} type={} status={} userMessage={} body={}",
+                        endpoint, rre.getType(), rre.getHttpStatus(), rre.getMessage(), rre.getRawBody());
+            }
+        } else {
+            log.error("[RR][ERROR] {} -> {} {}", endpoint, e.getClass().getSimpleName(), e.getMessage());
+        }
     }
 
     @GetMapping("/domains")
